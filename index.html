@@ -183,13 +183,13 @@
         const [f, setF] = useState(r || { storeId: '', date: new Date().toISOString().split('T')[0], startTime: '20:00', endTime: '01:00', hourlyWage: '', drink: 0, shot: 0, nomination: 0, mainNomination: 0, dohan: 0, transportBack: 0, customBacks: [], transportCost: 0, drinkBack: 200, shotBack: 500, nominationBack: 700, mainNominationBack: 1000, dohanBack: 0, backTiming: 'next', transTiming: 'ded' });
         const [del, setDel] = useState(false);
         const [saving, setSaving] = useState(false);
-        const st = stores.find(x => x.id === Number(f.storeId));
+        const st = stores.find(x => String(x.id) === String(f.storeId));
         useEffect(() => {
           if (st && !r) setF(x => ({ ...x, hourlyWage: st.hourlyWage, drinkBack: st.drinkBack || 200, shotBack: st.shotBack || 500, nominationBack: st.nominationBack || 700, mainNominationBack: st.mainNominationBack || 1000, dohanBack: st.dohanBack || 0 }));
         }, [f.storeId]);
         const hrs = () => { const [sh, sm] = f.startTime.split(':').map(Number); const [eh, em] = f.endTime.split(':').map(Number); let s = sh + sm / 60, e = eh + em / 60; if (e <= s) e += 24; return e - s; };
         const bk = () => f.drink * (Number(f.drinkBack) || 200) + f.shot * (Number(f.shotBack) || 500) + f.nomination * (Number(f.nominationBack) || 700) + f.mainNomination * (Number(f.mainNominationBack) || 1000) + f.dohan * (Number(f.dohanBack) || 0) + Number(f.transportBack || 0) + f.customBacks.reduce((s, b) => s + b.amount, 0);
-        const pay = () => { const h = hrs(), w = Number(f.hourlyWage) * h, b = bk(), tot = w + b; let ded = st ? tot * (st.deductionRate / 100) : 0; ded = Math.ceil(ded / 50) * 50; const tr = Number(f.transportCost) || 0; let im = f.backTiming === 'imm' ? w + b - ded : w - ded; let nx = f.backTiming === 'imm' ? 0 : b; let tp = f.transTiming === 'nx' ? tr : (im -= tr, 0); return { immediate: im, nextMonth: nx, transportPay: tp }; };
+        const pay = () => { const h = hrs(), w = Number(f.hourlyWage) * h, b = bk(), tot = w + b; let ded = st ? tot * (Number(st.deductionRate) / 100) : 0; ded = Math.ceil(ded / 50) * 50; const tr = Number(f.transportCost) || 0; let im = f.backTiming === 'imm' ? w + b - ded : w - ded; let nx = f.backTiming === 'imm' ? 0 : b; let tp = f.transTiming === 'nx' ? tr : (im -= tr, 0); return { immediate: im, nextMonth: nx, transportPay: tp }; };
         const save = async () => {
           if (!f.storeId || !f.date || !f.hourlyWage) return;
           setSaving(true);
@@ -248,8 +248,8 @@
       };
 
       const Stats = ({ sid, y, m }) => {
-        const st = stores.find(s => s.id === Number(sid));
-        const rs = records.filter(r => Number(r.storeId) === Number(sid) && r.date.startsWith(`${y}-${String(m).padStart(2, '0')}`));
+        const st = stores.find(s => String(s.id) === String(sid));
+        const rs = records.filter(r => String(r.storeId) === String(sid) && r.date.startsWith(`${y}-${String(m).padStart(2, '0')}`));
         const tot = rs.reduce((s, r) => ({ im: s.im + r.immediate, nx: s.nx + r.nextMonth }), { im: 0, nx: 0 });
         const h = rs.reduce((s, r) => s + r.hours, 0);
         const bk = rs.reduce((s, r) => s + r.back, 0);
@@ -277,7 +277,7 @@
         const [y, setY] = useState(new Date().getFullYear());
         const [m, setM] = useState(new Date().getMonth() + 1);
         const rs = records.filter(r => r.date.startsWith(`${y}-${String(m).padStart(2, '0')}`));
-        const ids = [...new Set(rs.map(r => Number(r.storeId)))];
+        const ids = [...new Set(rs.map(r => String(r.storeId)))];
         const tot = rs.reduce((s, r) => ({ im: s.im + r.immediate, nx: s.nx + r.nextMonth }), { im: 0, nx: 0 });
         const h = rs.reduce((s, r) => s + r.hours, 0);
         return (
