@@ -180,7 +180,7 @@
       };
 
       const RecordForm = ({ r, onDone }) => {
-        const [f, setF] = useState(r || { storeId: '', date: new Date().toISOString().split('T')[0], startTime: '20:00', endTime: '01:00', hourlyWage: '', drink: 0, shot: 0, nomination: 0, mainNomination: 0, dohan: 0, transportBack: 0, customBacks: [], transportCost: 0, drinkBack: 200, shotBack: 500, nominationBack: 700, mainNominationBack: 1000, dohanBack: 0, backTiming: 'next', transTiming: 'ded' });
+        const [f, setF] = useState(r || { storeId: '', date: new Date().toISOString().split('T')[0], startTime: '20:00', endTime: '01:00', hourlyWage: '', drink: 0, shot: 0, nomination: 0, mainNomination: 0, dohan: 0, customBacks: [], transportCost: 0, prevTransportPay: 0, drinkBack: 200, shotBack: 500, nominationBack: 700, mainNominationBack: 1000, dohanBack: 0, backTiming: 'next' });
         const [del, setDel] = useState(false);
         const [saving, setSaving] = useState(false);
         const st = stores.find(x => String(x.id) === String(f.storeId));
@@ -188,8 +188,8 @@
           if (st && !r) setF(x => ({ ...x, hourlyWage: st.hourlyWage, drinkBack: st.drinkBack || 200, shotBack: st.shotBack || 500, nominationBack: st.nominationBack || 700, mainNominationBack: st.mainNominationBack || 1000, dohanBack: st.dohanBack || 0 }));
         }, [f.storeId]);
         const hrs = () => { const [sh, sm] = f.startTime.split(':').map(Number); const [eh, em] = f.endTime.split(':').map(Number); let s = sh + sm / 60, e = eh + em / 60; if (e <= s) e += 24; return e - s; };
-        const bk = () => f.drink * (Number(f.drinkBack) || 200) + f.shot * (Number(f.shotBack) || 500) + f.nomination * (Number(f.nominationBack) || 700) + f.mainNomination * (Number(f.mainNominationBack) || 1000) + f.dohan * (Number(f.dohanBack) || 0) + Number(f.transportBack || 0) + f.customBacks.reduce((s, b) => s + b.amount, 0);
-        const pay = () => { const h = hrs(), w = Number(f.hourlyWage) * h, b = bk(), tot = w + b; let ded = st ? tot * (Number(st.deductionRate) / 100) : 0; ded = Math.ceil(ded / 50) * 50; const tr = Number(f.transportCost) || 0; let im = f.backTiming === 'imm' ? w + b - ded : w - ded; let nx = f.backTiming === 'imm' ? 0 : b; let tp = f.transTiming === 'nx' ? tr : (im -= tr, 0); return { immediate: im, nextMonth: nx, transportPay: tp }; };
+        const bk = () => f.drink * (Number(f.drinkBack) || 200) + f.shot * (Number(f.shotBack) || 500) + f.nomination * (Number(f.nominationBack) || 700) + f.mainNomination * (Number(f.mainNominationBack) || 1000) + f.dohan * (Number(f.dohanBack) || 0) + f.customBacks.reduce((s, b) => s + b.amount, 0);
+        const pay = () => { const h = hrs(), w = Number(f.hourlyWage) * h, b = bk(), tot = w + b; let ded = st ? tot * (Number(st.deductionRate) / 100) : 0; ded = Math.ceil(ded / 50) * 50; const tr = Number(f.transportCost) || 0; const pp = Number(f.prevTransportPay) || 0; let im = f.backTiming === 'imm' ? w + b - ded : w - ded; im = im - tr + pp; let nx = f.backTiming === 'imm' ? 0 : b; return { immediate: im, nextMonth: nx, transportCost: tr, prevTransportPay: pp }; };
         const save = async () => {
           if (!f.storeId || !f.date || !f.hourlyWage) return;
           setSaving(true);
@@ -209,9 +209,15 @@
             <div className="text-xs text-purple-300">{hrs().toFixed(1)}h</div>
             <input type="number" className="w-full bg-gray-800 border border-purple-500 rounded px-4 py-2 text-white" placeholder="時給" value={f.hourlyWage} onChange={e => setF({...f, hourlyWage: e.target.value})} />
             <select className="w-full bg-gray-800 border border-purple-500 rounded px-3 py-2 text-white text-sm" value={f.backTiming} onChange={e => setF({...f, backTiming: e.target.value})}><option value="next">バック翌月</option><option value="imm">バック当日</option></select>
-            <div>
-              <input type="number" className="w-full bg-gray-800 border border-purple-500 rounded px-3 py-2 text-white text-sm mb-1" placeholder="送迎代" value={f.transportCost} onChange={e => setF({...f, transportCost: e.target.value})} />
-              <select className="w-full bg-gray-800 border border-purple-500 rounded px-3 py-2 text-white text-xs" value={f.transTiming} onChange={e => setF({...f, transTiming: e.target.value})}><option value="ded">差引</option><option value="nx">次回</option></select>
+            <div className="space-y-2">
+              <div className="bg-gray-800 rounded p-2">
+                <label className="text-xs text-gray-400 block mb-1">差引の送迎代</label>
+                <input type="number" className="w-full bg-gray-900 border border-purple-500 rounded px-2 py-1 text-sm text-white" placeholder="0" value={f.transportCost} onChange={e => setF({...f, transportCost: e.target.value})} />
+              </div>
+              <div className="bg-gray-800 rounded p-2">
+                <label className="text-xs text-gray-400 block mb-1">前回分支給の送迎代</label>
+                <input type="number" className="w-full bg-gray-900 border border-purple-500 rounded px-2 py-1 text-sm text-white" placeholder="0" value={f.prevTransportPay} onChange={e => setF({...f, prevTransportPay: e.target.value})} />
+              </div>
             </div>
             <div className="space-y-1">
               <Cnt l={`ドリンク¥${f.drinkBack||200}`} v={f.drink} o={v => setF({...f, drink: v})} />
@@ -219,10 +225,7 @@
               <Cnt l={`場内¥${f.nominationBack||700}`} v={f.nomination} o={v => setF({...f, nomination: v})} />
               <Cnt l={`本指名¥${f.mainNominationBack||1000}`} v={f.mainNomination} o={v => setF({...f, mainNomination: v})} />
               <Cnt l={`同伴¥${f.dohanBack||0}`} v={f.dohan} o={v => setF({...f, dohan: v})} />
-              <div className="bg-gray-800 rounded p-2">
-                <label className="text-xs text-gray-400 block mb-1">送迎バック</label>
-                <input type="number" className="w-full bg-gray-900 border border-purple-500 rounded px-2 py-1 text-sm text-white" placeholder="0" value={f.transportBack} onChange={e => setF({...f, transportBack: e.target.value})} />
-              </div>
+
               {f.customBacks.map((c, i) => (
                 <div key={i} className="flex gap-1 bg-gray-800 rounded p-2">
                   <input className="flex-1 bg-gray-900 border border-purple-500 rounded px-2 py-1 text-xs text-white" value={c.name} onChange={e => setF({...f, customBacks: f.customBacks.map((b, j) => j === i ? {...b, name: e.target.value} : b)})} />
@@ -235,7 +238,7 @@
             <div className="bg-purple-900 bg-opacity-30 rounded p-3 space-y-1 text-sm">
               <div className="flex justify-between"><span>当日</span><span className="font-bold">¥{p.immediate.toLocaleString()}</span></div>
               <div className="flex justify-between"><span>翌月</span><span className="font-bold">¥{p.nextMonth.toLocaleString()}</span></div>
-              {p.transportPay > 0 && <div className="flex justify-between border-t border-purple-700 pt-1"><span>送迎</span><span className="font-bold text-green-400">¥{p.transportPay.toLocaleString()}</span></div>}
+              {(p.transportCost > 0 || p.prevTransportPay > 0) && <div className="border-t border-purple-700 pt-1 space-y-1">{p.transportCost > 0 && <div className="flex justify-between"><span>差引送迎代</span><span className="font-bold text-red-400">-¥{p.transportCost.toLocaleString()}</span></div>}{p.prevTransportPay > 0 && <div className="flex justify-between"><span>前回分支給</span><span className="font-bold text-green-400">+¥{p.prevTransportPay.toLocaleString()}</span></div>}</div>}
             </div>
             <div className="flex gap-2">
               <button onClick={save} disabled={saving} className="flex-1 bg-purple-600 py-2 rounded disabled:opacity-50">{saving ? '保存中...' : '保存'}</button>
@@ -253,21 +256,21 @@
         const tot = rs.reduce((s, r) => ({ im: s.im + r.immediate, nx: s.nx + r.nextMonth }), { im: 0, nx: 0 });
         const h = rs.reduce((s, r) => s + r.hours, 0);
         const bk = rs.reduce((s, r) => s + r.back, 0);
-        const bd = rs.reduce((s, r) => ({ d: s.d + (r.drink||0), s: s.s + (r.shot||0), n: s.n + (r.nomination||0), m: s.m + (r.mainNomination||0), dh: s.dh + (r.dohan||0), tb: s.tb + (Number(r.transportBack)||0), c: s.c + (r.customBacks||[]).reduce((x, b) => x + b.amount, 0) }), { d: 0, s: 0, n: 0, m: 0, dh: 0, tb: 0, c: 0 });
+        const bd = rs.reduce((s, r) => ({ d: s.d + (r.drink||0), s: s.s + (r.shot||0), n: s.n + (r.nomination||0), m: s.m + (r.mainNomination||0), dh: s.dh + (r.dohan||0), c: s.c + (r.customBacks||[]).reduce((x, b) => x + b.amount, 0) }), { d: 0, s: 0, n: 0, m: 0, dh: 0, c: 0 });
         const da = rs.reduce((s, r) => s + (r.drink||0) * (r.drinkBack||200), 0);
         const sa = rs.reduce((s, r) => s + (r.shot||0) * (r.shotBack||500), 0);
         const na = rs.reduce((s, r) => s + (r.nomination||0) * (r.nominationBack||700), 0);
         const ma = rs.reduce((s, r) => s + (r.mainNomination||0) * (r.mainNominationBack||1000), 0);
         const dha = rs.reduce((s, r) => s + (r.dohan||0) * (r.dohanBack||0), 0);
-        const transCost = rs.reduce((s, r) => s + (r.transTiming === 'ded' ? Number(r.transportCost||0) : 0), 0);
-        const transNext = rs.reduce((s, r) => s + (r.transTiming === 'nx' ? Number(r.transportCost||0) : 0), 0);
+        const transCost = rs.reduce((s, r) => s + Number(r.transportCost||0), 0);
+        const transNext = rs.reduce((s, r) => s + Number(r.prevTransportPay||0), 0);
         return (
           <div className="bg-gray-800 rounded p-3 mb-3">
             <h3 className="font-bold text-purple-300 mb-2">{st?.name}</h3>
             <div className="grid grid-cols-2 gap-3 mb-2 text-sm"><div><div className="text-xs text-gray-400">当月</div><div className="font-bold">¥{tot.im.toLocaleString()}</div></div><div><div className="text-xs text-gray-400">翌月</div><div className="font-bold">¥{tot.nx.toLocaleString()}</div></div></div>
             <div className="text-xs text-gray-400 mb-2">{h.toFixed(1)}h / ¥{bk.toLocaleString()} / {rs.length}日</div>
-            <div className="bg-gray-900 rounded p-2 mb-2"><div className="text-xs text-purple-300 mb-1">バック</div><div className="grid grid-cols-2 gap-1 text-xs"><div className="flex justify-between"><span className="text-gray-400">ドリンク</span><span>{bd.d}¥{da.toLocaleString()}</span></div><div className="flex justify-between"><span className="text-gray-400">ショット</span><span>{bd.s}¥{sa.toLocaleString()}</span></div><div className="flex justify-between"><span className="text-gray-400">場内</span><span>{bd.n}¥{na.toLocaleString()}</span></div><div className="flex justify-between"><span className="text-gray-400">本指名</span><span>{bd.m}¥{ma.toLocaleString()}</span></div>{bd.dh > 0 && <div className="flex justify-between"><span className="text-gray-400">同伴</span><span>{bd.dh}¥{dha.toLocaleString()}</span></div>}{bd.tb > 0 && <div className="flex justify-between"><span className="text-gray-400">送迎</span><span>¥{bd.tb.toLocaleString()}</span></div>}{bd.c > 0 && <div className="flex justify-between col-span-2"><span className="text-gray-400">他</span><span>¥{bd.c.toLocaleString()}</span></div>}</div></div>
-            {(transCost > 0 || transNext > 0) && <div className="bg-gray-900 rounded p-2 mb-2"><div className="text-xs text-purple-300 mb-1">送迎代</div><div className="grid grid-cols-2 gap-1 text-xs">{transCost > 0 && <div className="flex justify-between"><span className="text-gray-400">差引</span><span className="text-red-400">-¥{transCost.toLocaleString()}</span></div>}{transNext > 0 && <div className="flex justify-between"><span className="text-gray-400">次回支給</span><span className="text-green-400">+¥{transNext.toLocaleString()}</span></div>}</div></div>}
+            <div className="bg-gray-900 rounded p-2 mb-2"><div className="text-xs text-purple-300 mb-1">バック</div><div className="grid grid-cols-2 gap-1 text-xs"><div className="flex justify-between"><span className="text-gray-400">ドリンク</span><span>{bd.d}¥{da.toLocaleString()}</span></div><div className="flex justify-between"><span className="text-gray-400">ショット</span><span>{bd.s}¥{sa.toLocaleString()}</span></div><div className="flex justify-between"><span className="text-gray-400">場内</span><span>{bd.n}¥{na.toLocaleString()}</span></div><div className="flex justify-between"><span className="text-gray-400">本指名</span><span>{bd.m}¥{ma.toLocaleString()}</span></div>{bd.dh > 0 && <div className="flex justify-between"><span className="text-gray-400">同伴</span><span>{bd.dh}¥{dha.toLocaleString()}</span></div>}{bd.c > 0 && <div className="flex justify-between col-span-2"><span className="text-gray-400">他</span><span>¥{bd.c.toLocaleString()}</span></div>}</div></div>
+            {(transCost > 0 || transNext > 0) && <div className="bg-gray-900 rounded p-2 mb-2"><div className="text-xs text-purple-300 mb-1">送迎代</div><div className="grid grid-cols-2 gap-1 text-xs">{transCost > 0 && <div className="flex justify-between"><span className="text-gray-400">差引</span><span className="text-red-400">-¥{transCost.toLocaleString()}</span></div>}{transNext > 0 && <div className="flex justify-between"><span className="text-gray-400">前回分支給</span><span className="text-green-400">+¥{transNext.toLocaleString()}</span></div>}</div></div>}
             <div className="space-y-1">{rs.length === 0 ? <div className="text-center text-gray-500 text-xs py-3">なし</div> : rs.sort((a, b) => b.date.localeCompare(a.date)).map(r => <div key={r.id} className="bg-gray-900 rounded p-2"><div className="flex justify-between items-center mb-1"><span className="text-xs">{r.date}</span><div className="flex items-center gap-1"><span className="font-bold text-sm">¥{r.immediate.toLocaleString()}</span><button onClick={() => { setEdit(r); setView('editRec'); }} className="p-1 bg-purple-600 rounded"><Edit2 size={12} /></button></div></div><div className="text-xs text-gray-400">{r.hours.toFixed(1)}h ¥{r.hourlyWage} バック¥{r.back}</div></div>)}</div>
           </div>
         );
