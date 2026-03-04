@@ -8,55 +8,193 @@
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Firebase compat SDK -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyC8U_Es7Clt0DSZbIkERoFo65vNsQveBOs",
+      authDomain: "night-salary-7b053.firebaseapp.com",
+      projectId: "night-salary-7b053",
+      storageBucket: "night-salary-7b053.firebasestorage.app",
+      messagingSenderId: "672117571324",
+      appId: "1:672117571324:web:6da69e9e55506cc82c6179"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db = firebase.firestore();
+  </script>
 </head>
 <body>
   <div id="root"></div>
-  
+
   <script type="text/babel">
     const { useState, useEffect } = React;
-    
-    // Lucide icons as SVG components
+
     const Plus = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>;
     const Minus = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="5" y1="12" x2="19" y2="12"/></svg>;
-    const X = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>;
+    const XIcon = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>;
     const ChevronLeft = ({ size = 24 }) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="15 18 9 12 15 6"/></svg>;
     const Edit2 = ({ size = 16 }) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>;
+    const LogOut = () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>;
 
-    // LocalStorage wrapper to mimic window.storage API
-    const storage = {
-      get: async (key) => {
-        const value = localStorage.getItem(key);
-        return value ? { value } : null;
-      },
-      set: async (key, value) => {
-        localStorage.setItem(key, value);
-      }
+    // Firestore helpers
+    const userCol = (uid, col) => db.collection('users').doc(uid).collection(col);
+    const loadCollection = async (uid, col) => {
+      const snap = await userCol(uid, col).get();
+      return snap.docs.map(d => ({ ...d.data(), id: d.id }));
+    };
+    const saveDoc = async (uid, col, item) => {
+      const { id, ...data } = item;
+      await userCol(uid, col).doc(String(id)).set(data);
+    };
+    const removeDoc = async (uid, col, id) => {
+      await userCol(uid, col).doc(String(id)).delete();
     };
 
-    const App = () => {
+    // Auth Screen
+    const AuthScreen = () => {
+      const [isLogin, setIsLogin] = useState(true);
+      const [email, setEmail] = useState('');
+      const [password, setPassword] = useState('');
+      const [error, setError] = useState('');
+      const [loading, setLoading] = useState(false);
+
+      const handle = async () => {
+        setError('');
+        setLoading(true);
+        try {
+          if (isLogin) {
+            await auth.signInWithEmailAndPassword(email, password);
+          } else {
+            await auth.createUserWithEmailAndPassword(email, password);
+          }
+        } catch (e) {
+          const msgs = {
+            'auth/user-not-found': 'メールアドレスが見つかりません',
+            'auth/wrong-password': 'パスワードが違います',
+            'auth/email-already-in-use': 'このメールアドレスは既に使用されています',
+            'auth/weak-password': 'パスワードは6文字以上にしてください',
+            'auth/invalid-email': 'メールアドレスの形式が正しくありません',
+            'auth/invalid-credential': 'メールアドレスまたはパスワードが違います',
+          };
+          setError(msgs[e.code] || e.message);
+        }
+        setLoading(false);
+      };
+
+      return (
+        <div className="min-h-screen bg-black text-white flex items-center justify-center p-6">
+          <div className="w-full max-w-sm">
+            <div className="text-center mb-8">
+              <h1 className="text-2xl font-bold text-purple-300">給料管理</h1>
+              <p className="text-gray-500 text-sm mt-1">{isLogin ? 'ログイン' : '新規登録'}</p>
+            </div>
+            <div className="space-y-3">
+              <input
+                type="email"
+                className="w-full bg-gray-800 border border-purple-500 rounded px-4 py-3 text-white"
+                placeholder="メールアドレス"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+              />
+              <input
+                type="password"
+                className="w-full bg-gray-800 border border-purple-500 rounded px-4 py-3 text-white"
+                placeholder="パスワード（6文字以上）"
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && handle()}
+              />
+              {error && <p className="text-red-400 text-sm text-center">{error}</p>}
+              <button
+                onClick={handle}
+                disabled={loading}
+                className="w-full bg-purple-600 py-3 rounded font-bold disabled:opacity-50"
+              >
+                {loading ? '処理中...' : (isLogin ? 'ログイン' : '登録する')}
+              </button>
+              <button
+                onClick={() => { setIsLogin(!isLogin); setError(''); }}
+                className="w-full text-purple-400 text-sm py-2"
+              >
+                {isLogin ? 'アカウントを新規作成する' : 'ログイン画面へ戻る'}
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    // Main App
+    const MainApp = ({ user }) => {
+      const uid = user.uid;
       const [stores, setStores] = useState([]);
       const [records, setRecords] = useState([]);
       const [view, setView] = useState('menu');
       const [edit, setEdit] = useState(null);
+      const [loading, setLoading] = useState(true);
 
       useEffect(() => {
         (async () => {
           try {
-            const s = await storage.get('stores');
-            const r = await storage.get('records');
-            if (s) setStores(JSON.parse(s.value));
-            if (r) setRecords(JSON.parse(r.value));
-          } catch (e) {}
+            const [s, r] = await Promise.all([
+              loadCollection(uid, 'stores'),
+              loadCollection(uid, 'records')
+            ]);
+            setStores(s);
+            setRecords(r);
+          } catch (e) { console.error(e); }
+          setLoading(false);
         })();
-      }, []);
+      }, [uid]);
 
-      const saveStores = async (d) => { setStores(d); await storage.set('stores', JSON.stringify(d)); };
-      const saveRecords = async (d) => { setRecords(d); await storage.set('records', JSON.stringify(d)); };
+      const addStore = async (item) => {
+        const newItem = { ...item, id: Date.now() };
+        await saveDoc(uid, 'stores', newItem);
+        setStores(prev => [...prev, newItem]);
+      };
+      const updateStore = async (item) => {
+        await saveDoc(uid, 'stores', item);
+        setStores(prev => prev.map(x => x.id === item.id ? item : x));
+      };
+      const deleteStore = async (id) => {
+        await removeDoc(uid, 'stores', id);
+        setStores(prev => prev.filter(x => x.id !== id));
+      };
+
+      const addRecord = async (item) => {
+        const newItem = { ...item, id: Date.now() };
+        await saveDoc(uid, 'records', newItem);
+        setRecords(prev => [...prev, newItem]);
+      };
+      const updateRecord = async (item) => {
+        await saveDoc(uid, 'records', item);
+        setRecords(prev => prev.map(x => x.id === item.id ? item : x));
+      };
+      const deleteRecord = async (id) => {
+        await removeDoc(uid, 'records', id);
+        setRecords(prev => prev.filter(x => x.id !== id));
+      };
+
+      if (loading) return (
+        <div className="min-h-screen bg-black text-white flex items-center justify-center">
+          <p className="text-purple-300">読み込み中...</p>
+        </div>
+      );
 
       const StoreForm = ({ s, onDone }) => {
         const [f, setF] = useState(s || { name: '', hourlyWage: '', deductionRate: '', drinkBack: 200, shotBack: 500, nominationBack: 700, mainNominationBack: 1000, dohanBack: 0 });
         const [del, setDel] = useState(false);
-        const save = () => { if (!f.name || !f.hourlyWage || !f.deductionRate) return; saveStores(s ? stores.map(x => x.id === s.id ? { ...f, id: s.id } : x) : [...stores, { ...f, id: Date.now() }]); onDone(); };
+        const [saving, setSaving] = useState(false);
+        const save = async () => {
+          if (!f.name || !f.hourlyWage || !f.deductionRate) return;
+          setSaving(true);
+          if (s) { await updateStore({ ...f, id: s.id }); } else { await addStore(f); }
+          setSaving(false);
+          onDone();
+        };
         return (
           <div className="p-6 space-y-4">
             <input className="w-full bg-gray-800 border border-purple-500 rounded px-4 py-3 text-white" placeholder="店名" value={f.name} onChange={e => setF({...f, name: e.target.value})} />
@@ -69,9 +207,12 @@
               <input type="number" className="bg-gray-800 border border-purple-500 rounded px-3 py-2 text-white text-sm" placeholder="本指名" value={f.mainNominationBack} onChange={e => setF({...f, mainNominationBack: e.target.value})} />
               <input type="number" className="bg-gray-800 border border-purple-500 rounded px-3 py-2 text-white text-sm col-span-2" placeholder="同伴" value={f.dohanBack} onChange={e => setF({...f, dohanBack: e.target.value})} />
             </div>
-            <div className="flex gap-3"><button onClick={save} className="flex-1 bg-purple-600 py-3 rounded">保存</button><button onClick={onDone} className="flex-1 bg-gray-700 py-3 rounded">戻る</button></div>
+            <div className="flex gap-3">
+              <button onClick={save} disabled={saving} className="flex-1 bg-purple-600 py-3 rounded disabled:opacity-50">{saving ? '保存中...' : '保存'}</button>
+              <button onClick={onDone} className="flex-1 bg-gray-700 py-3 rounded">戻る</button>
+            </div>
             {s && !del && <button onClick={() => setDel(true)} className="w-full bg-red-600 py-3 rounded">削除</button>}
-            {s && del && <div className="bg-red-900 bg-opacity-30 border border-red-500 rounded p-4"><p className="text-center mb-3">削除しますか？</p><div className="flex gap-3"><button onClick={async () => { await saveStores(stores.filter(x => x.id !== s.id)); onDone(); }} className="flex-1 bg-red-600 py-3 rounded">削除</button><button onClick={() => setDel(false)} className="flex-1 bg-gray-700 py-3 rounded">戻る</button></div></div>}
+            {s && del && <div className="bg-red-900 bg-opacity-30 border border-red-500 rounded p-4"><p className="text-center mb-3">削除しますか？</p><div className="flex gap-3"><button onClick={async () => { await deleteStore(s.id); onDone(); }} className="flex-1 bg-red-600 py-3 rounded">削除</button><button onClick={() => setDel(false)} className="flex-1 bg-gray-700 py-3 rounded">戻る</button></div></div>}
           </div>
         );
       };
@@ -79,12 +220,23 @@
       const RecordForm = ({ r, onDone }) => {
         const [f, setF] = useState(r || { storeId: '', date: new Date().toISOString().split('T')[0], startTime: '20:00', endTime: '01:00', hourlyWage: '', drink: 0, shot: 0, nomination: 0, mainNomination: 0, dohan: 0, transportBack: 0, customBacks: [], transportCost: 0, drinkBack: 200, shotBack: 500, nominationBack: 700, mainNominationBack: 1000, dohanBack: 0, backTiming: 'next', transTiming: 'ded' });
         const [del, setDel] = useState(false);
+        const [saving, setSaving] = useState(false);
         const st = stores.find(x => x.id === Number(f.storeId));
-        useEffect(() => { if (st && !r) setF(x => ({ ...x, hourlyWage: st.hourlyWage, drinkBack: st.drinkBack || 200, shotBack: st.shotBack || 500, nominationBack: st.nominationBack || 700, mainNominationBack: st.mainNominationBack || 1000, dohanBack: st.dohanBack || 0 })); }, [f.storeId, st, r]);
+        useEffect(() => {
+          if (st && !r) setF(x => ({ ...x, hourlyWage: st.hourlyWage, drinkBack: st.drinkBack || 200, shotBack: st.shotBack || 500, nominationBack: st.nominationBack || 700, mainNominationBack: st.mainNominationBack || 1000, dohanBack: st.dohanBack || 0 }));
+        }, [f.storeId]);
         const hrs = () => { const [sh, sm] = f.startTime.split(':').map(Number); const [eh, em] = f.endTime.split(':').map(Number); let s = sh + sm / 60, e = eh + em / 60; if (e <= s) e += 24; return e - s; };
         const bk = () => f.drink * (Number(f.drinkBack) || 200) + f.shot * (Number(f.shotBack) || 500) + f.nomination * (Number(f.nominationBack) || 700) + f.mainNomination * (Number(f.mainNominationBack) || 1000) + f.dohan * (Number(f.dohanBack) || 0) + Number(f.transportBack || 0) + f.customBacks.reduce((s, b) => s + b.amount, 0);
         const pay = () => { const h = hrs(), w = Number(f.hourlyWage) * h, b = bk(), tot = w + b; let ded = st ? tot * (st.deductionRate / 100) : 0; ded = Math.ceil(ded / 50) * 50; const tr = Number(f.transportCost) || 0; let im = f.backTiming === 'imm' ? w + b - ded : w - ded; let nx = f.backTiming === 'imm' ? 0 : b; let tp = f.transTiming === 'nx' ? tr : (im -= tr, 0); return { immediate: im, nextMonth: nx, transportPay: tp }; };
-        const save = () => { if (!f.storeId || !f.date || !f.hourlyWage) return; const p = pay(); saveRecords(r ? records.map(x => x.id === r.id ? { ...f, id: r.id, hours: hrs(), back: bk(), ...p } : x) : [...records, { ...f, id: Date.now(), hours: hrs(), back: bk(), ...p }]); onDone(); };
+        const save = async () => {
+          if (!f.storeId || !f.date || !f.hourlyWage) return;
+          setSaving(true);
+          const p = pay();
+          const item = { ...f, hours: hrs(), back: bk(), ...p };
+          if (r) { await updateRecord({ ...item, id: r.id }); } else { await addRecord(item); }
+          setSaving(false);
+          onDone();
+        };
         const Cnt = ({ l, v, o }) => <div className="flex justify-between bg-gray-800 rounded p-2"><span className="text-xs">{l}</span><div className="flex gap-2"><button onClick={() => o(Math.max(0, v - 1))} className="bg-purple-600 p-1 rounded"><Minus /></button><span className="w-8 text-center text-sm">{v}</span><button onClick={() => o(v + 1)} className="bg-purple-600 p-1 rounded"><Plus /></button></div></div>;
         const p = pay();
         return (
@@ -95,7 +247,10 @@
             <div className="text-xs text-purple-300">{hrs().toFixed(1)}h</div>
             <input type="number" className="w-full bg-gray-800 border border-purple-500 rounded px-4 py-2 text-white" placeholder="時給" value={f.hourlyWage} onChange={e => setF({...f, hourlyWage: e.target.value})} />
             <select className="w-full bg-gray-800 border border-purple-500 rounded px-3 py-2 text-white text-sm" value={f.backTiming} onChange={e => setF({...f, backTiming: e.target.value})}><option value="next">バック翌月</option><option value="imm">バック当日</option></select>
-            <div><input type="number" className="w-full bg-gray-800 border border-purple-500 rounded px-3 py-2 text-white text-sm mb-1" placeholder="送迎代" value={f.transportCost} onChange={e => setF({...f, transportCost: e.target.value})} /><select className="w-full bg-gray-800 border border-purple-500 rounded px-3 py-2 text-white text-xs" value={f.transTiming} onChange={e => setF({...f, transTiming: e.target.value})}><option value="ded">差引</option><option value="nx">次回</option></select></div>
+            <div>
+              <input type="number" className="w-full bg-gray-800 border border-purple-500 rounded px-3 py-2 text-white text-sm mb-1" placeholder="送迎代" value={f.transportCost} onChange={e => setF({...f, transportCost: e.target.value})} />
+              <select className="w-full bg-gray-800 border border-purple-500 rounded px-3 py-2 text-white text-xs" value={f.transTiming} onChange={e => setF({...f, transTiming: e.target.value})}><option value="ded">差引</option><option value="nx">次回</option></select>
+            </div>
             <div className="space-y-1">
               <Cnt l={`ドリンク¥${f.drinkBack||200}`} v={f.drink} o={v => setF({...f, drink: v})} />
               <Cnt l={`ショット¥${f.shotBack||500}`} v={f.shot} o={v => setF({...f, shot: v})} />
@@ -106,13 +261,26 @@
                 <label className="text-xs text-gray-400 block mb-1">送迎バック</label>
                 <input type="number" className="w-full bg-gray-900 border border-purple-500 rounded px-2 py-1 text-sm text-white" placeholder="0" value={f.transportBack} onChange={e => setF({...f, transportBack: e.target.value})} />
               </div>
-              {f.customBacks.map((c, i) => <div key={i} className="flex gap-1 bg-gray-800 rounded p-2"><input className="flex-1 bg-gray-900 border border-purple-500 rounded px-2 py-1 text-xs" value={c.name} onChange={e => setF({...f, customBacks: f.customBacks.map((b, j) => j === i ? {...b, name: e.target.value} : b)})} /><input type="number" className="w-20 bg-gray-900 border border-purple-500 rounded px-2 py-1 text-xs" value={c.amount} onChange={e => setF({...f, customBacks: f.customBacks.map((b, j) => j === i ? {...b, amount: Number(e.target.value)} : b)})} /><button onClick={() => setF({...f, customBacks: f.customBacks.filter((_, j) => j !== i)})} className="bg-red-600 p-1 rounded"><X /></button></div>)}
+              {f.customBacks.map((c, i) => (
+                <div key={i} className="flex gap-1 bg-gray-800 rounded p-2">
+                  <input className="flex-1 bg-gray-900 border border-purple-500 rounded px-2 py-1 text-xs text-white" value={c.name} onChange={e => setF({...f, customBacks: f.customBacks.map((b, j) => j === i ? {...b, name: e.target.value} : b)})} />
+                  <input type="number" className="w-20 bg-gray-900 border border-purple-500 rounded px-2 py-1 text-xs text-white" value={c.amount} onChange={e => setF({...f, customBacks: f.customBacks.map((b, j) => j === i ? {...b, amount: Number(e.target.value)} : b)})} />
+                  <button onClick={() => setF({...f, customBacks: f.customBacks.filter((_, j) => j !== i)})} className="bg-red-600 p-1 rounded"><XIcon /></button>
+                </div>
+              ))}
               <button onClick={() => setF({...f, customBacks: [...f.customBacks, {name: '', amount: 0}]})} className="w-full bg-gray-700 py-2 rounded text-xs">追加</button>
             </div>
-            <div className="bg-purple-900 bg-opacity-30 rounded p-3 space-y-1 text-sm"><div className="flex justify-between"><span>当日</span><span className="font-bold">¥{p.immediate.toLocaleString()}</span></div><div className="flex justify-between"><span>翌月</span><span className="font-bold">¥{p.nextMonth.toLocaleString()}</span></div>{p.transportPay > 0 && <div className="flex justify-between border-t border-purple-700 pt-1"><span>送迎</span><span className="font-bold text-green-400">¥{p.transportPay.toLocaleString()}</span></div>}</div>
-            <div className="flex gap-2"><button onClick={save} className="flex-1 bg-purple-600 py-2 rounded">保存</button><button onClick={onDone} className="flex-1 bg-gray-700 py-2 rounded">戻る</button></div>
+            <div className="bg-purple-900 bg-opacity-30 rounded p-3 space-y-1 text-sm">
+              <div className="flex justify-between"><span>当日</span><span className="font-bold">¥{p.immediate.toLocaleString()}</span></div>
+              <div className="flex justify-between"><span>翌月</span><span className="font-bold">¥{p.nextMonth.toLocaleString()}</span></div>
+              {p.transportPay > 0 && <div className="flex justify-between border-t border-purple-700 pt-1"><span>送迎</span><span className="font-bold text-green-400">¥{p.transportPay.toLocaleString()}</span></div>}
+            </div>
+            <div className="flex gap-2">
+              <button onClick={save} disabled={saving} className="flex-1 bg-purple-600 py-2 rounded disabled:opacity-50">{saving ? '保存中...' : '保存'}</button>
+              <button onClick={onDone} className="flex-1 bg-gray-700 py-2 rounded">戻る</button>
+            </div>
             {r && !del && <button onClick={() => setDel(true)} className="w-full bg-red-600 py-2 rounded">削除</button>}
-            {r && del && <div className="bg-red-900 bg-opacity-30 border border-red-500 rounded p-3"><p className="text-center mb-2 text-sm">削除？</p><div className="flex gap-2"><button onClick={async () => { await saveRecords(records.filter(x => x.id !== r.id)); onDone(); }} className="flex-1 bg-red-600 py-2 rounded">削除</button><button onClick={() => setDel(false)} className="flex-1 bg-gray-700 py-2 rounded">戻る</button></div></div>}
+            {r && del && <div className="bg-red-900 bg-opacity-30 border border-red-500 rounded p-3"><p className="text-center mb-2 text-sm">削除？</p><div className="flex gap-2"><button onClick={async () => { await deleteRecord(r.id); onDone(); }} className="flex-1 bg-red-600 py-2 rounded">削除</button><button onClick={() => setDel(false)} className="flex-1 bg-gray-700 py-2 rounded">戻る</button></div></div>}
           </div>
         );
       };
@@ -152,7 +320,11 @@
         const h = rs.reduce((s, r) => s + r.hours, 0);
         return (
           <div className="p-6">
-            <div className="flex items-center gap-3 mb-4"><button onClick={() => m === 1 ? (setY(y - 1), setM(12)) : setM(m - 1)} className="bg-purple-600 p-2 rounded"><ChevronLeft size={18} /></button><h2 className="text-lg font-bold text-purple-300 flex-1 text-center">{y}年{m}月</h2><button onClick={() => m === 12 ? (setY(y + 1), setM(1)) : setM(m + 1)} className="bg-purple-600 p-2 rounded" style={{transform: 'rotate(180deg)'}}><ChevronLeft size={18} /></button></div>
+            <div className="flex items-center gap-3 mb-4">
+              <button onClick={() => m === 1 ? (setY(y - 1), setM(12)) : setM(m - 1)} className="bg-purple-600 p-2 rounded"><ChevronLeft size={18} /></button>
+              <h2 className="text-lg font-bold text-purple-300 flex-1 text-center">{y}年{m}月</h2>
+              <button onClick={() => m === 12 ? (setY(y + 1), setM(1)) : setM(m + 1)} className="bg-purple-600 p-2 rounded" style={{transform: 'rotate(180deg)'}}><ChevronLeft size={18} /></button>
+            </div>
             <div className="bg-purple-900 bg-opacity-30 rounded p-3 mb-4"><div className="grid grid-cols-2 gap-3 mb-2"><div><div className="text-xs text-gray-400">当月</div><div className="text-xl font-bold">¥{tot.im.toLocaleString()}</div></div><div><div className="text-xs text-gray-400">翌月</div><div className="text-xl font-bold">¥{tot.nx.toLocaleString()}</div></div></div><div className="text-center pt-2 border-t border-purple-700"><div className="text-xs text-gray-400">総額</div><div className="text-2xl font-bold text-purple-200">¥{(tot.im + tot.nx).toLocaleString()}</div><div className="text-xs text-gray-500 mt-1">{h.toFixed(1)}h {rs.length}日</div></div></div>
             {ids.length === 0 && <div className="text-center text-gray-500 py-6">なし</div>}
             {ids.map(id => <Stats key={id} sid={id} y={y} m={m} />)}
@@ -163,13 +335,42 @@
       return (
         <div className="min-h-screen bg-black text-white">
           <div className="max-w-2xl mx-auto">
-            <div className="bg-gradient-to-r from-purple-900 to-purple-700 p-4"><div className="flex items-center">{view !== 'menu' && <button onClick={() => setView('menu')} className="p-2"><ChevronLeft size={20} /></button>}<h1 className="text-xl font-bold flex-1 text-center">給料管理</h1>{view !== 'menu' && <div className="w-10"></div>}</div></div>
-            {view === 'menu' && <div className="p-6 space-y-3">
-              <button onClick={() => setView('addRec')} className="w-full bg-purple-600 py-4 rounded-lg font-bold">給料入力</button>
-              <button onClick={() => setView('month')} className="w-full bg-purple-600 py-4 rounded-lg font-bold">月別集計</button>
-              <button onClick={() => setView('stores')} className="w-full bg-gray-800 py-4 rounded-lg font-bold">店舗管理</button>
-              <div className="bg-gray-900 rounded p-3 mt-4"><h3 className="text-xs text-gray-400 mb-2">店舗</h3>{stores.length === 0 ? <p className="text-gray-500 text-xs">なし</p> : <div className="space-y-2">{stores.map(s => <div key={s.id} className="bg-gray-800 rounded p-2"><div className="mb-1"><div className="text-sm font-bold">{s.name}</div><div className="text-xs text-gray-400">¥{s.hourlyWage} {s.deductionRate}%</div></div><button onClick={() => { setEdit(s); setView('editSt'); }} className="w-full bg-purple-600 py-1.5 rounded text-xs">編集</button></div>)}</div>}</div>
-            </div>}
+            <div className="bg-gradient-to-r from-purple-900 to-purple-700 p-4">
+              <div className="flex items-center">
+                {view !== 'menu'
+                  ? <button onClick={() => setView('menu')} className="p-2"><ChevronLeft size={20} /></button>
+                  : <div className="w-10"></div>
+                }
+                <h1 className="text-xl font-bold flex-1 text-center">給料管理</h1>
+                {view === 'menu'
+                  ? <button onClick={() => auth.signOut()} title="ログアウト" className="p-2 text-purple-200 hover:text-white"><LogOut /></button>
+                  : <div className="w-10"></div>
+                }
+              </div>
+            </div>
+
+            {view === 'menu' && (
+              <div className="p-6 space-y-3">
+                <button onClick={() => setView('addRec')} className="w-full bg-purple-600 py-4 rounded-lg font-bold">給料入力</button>
+                <button onClick={() => setView('month')} className="w-full bg-purple-600 py-4 rounded-lg font-bold">月別集計</button>
+                <button onClick={() => setView('stores')} className="w-full bg-gray-800 py-4 rounded-lg font-bold">店舗管理</button>
+                <div className="bg-gray-900 rounded p-3 mt-4">
+                  <h3 className="text-xs text-gray-400 mb-2">店舗</h3>
+                  {stores.length === 0
+                    ? <p className="text-gray-500 text-xs">なし</p>
+                    : <div className="space-y-2">{stores.map(s => (
+                        <div key={s.id} className="bg-gray-800 rounded p-2">
+                          <div className="mb-1">
+                            <div className="text-sm font-bold">{s.name}</div>
+                            <div className="text-xs text-gray-400">¥{s.hourlyWage} {s.deductionRate}%</div>
+                          </div>
+                          <button onClick={() => { setEdit(s); setView('editSt'); }} className="w-full bg-purple-600 py-1.5 rounded text-xs">編集</button>
+                        </div>
+                      ))}</div>
+                  }
+                </div>
+              </div>
+            )}
             {view === 'stores' && <div className="p-6"><button onClick={() => { setEdit(null); setView('addSt'); }} className="w-full bg-purple-600 py-3 rounded font-bold">新規追加</button></div>}
             {view === 'addSt' && <StoreForm onDone={() => setView('menu')} />}
             {view === 'editSt' && <StoreForm s={edit} onDone={() => setView('menu')} />}
@@ -181,7 +382,22 @@
       );
     };
 
-    ReactDOM.render(<App />, document.getElementById('root'));
+    // Root
+    const Root = () => {
+      const [user, setUser] = useState(undefined);
+      useEffect(() => {
+        const unsub = auth.onAuthStateChanged(u => setUser(u || null));
+        return unsub;
+      }, []);
+      if (user === undefined) return (
+        <div className="min-h-screen bg-black flex items-center justify-center">
+          <p className="text-purple-300">読み込み中...</p>
+        </div>
+      );
+      return user ? <MainApp user={user} /> : <AuthScreen />;
+    };
+
+    ReactDOM.render(<Root />, document.getElementById('root'));
   </script>
 </body>
 </html>
