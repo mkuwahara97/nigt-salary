@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>給料管理</title>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body>
+  <div id="root"></div>
+  
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+    
+    // Lucide icons as SVG components
+    const Plus = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>;
+    const Minus = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="5" y1="12" x2="19" y2="12"/></svg>;
+    const X = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>;
+    const ChevronLeft = ({ size = 24 }) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="15 18 9 12 15 6"/></svg>;
+    const Edit2 = ({ size = 16 }) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>;
+
+    // LocalStorage wrapper to mimic window.storage API
+    const storage = {
+      get: async (key) => {
+        const value = localStorage.getItem(key);
+        return value ? { value } : null;
+      },
+      set: async (key, value) => {
+        localStorage.setItem(key, value);
+      }
+    };
+
+    const App = () => {
+      const [stores, setStores] = useState([]);
+      const [records, setRecords] = useState([]);
+      const [view, setView] = useState('menu');
+      const [edit, setEdit] = useState(null);
+
+      useEffect(() => {
+        (async () => {
+          try {
+            const s = await storage.get('stores');
+            const r = await storage.get('records');
+            if (s) setStores(JSON.parse(s.value));
+            if (r) setRecords(JSON.parse(r.value));
+          } catch (e) {}
+        })();
+      }, []);
+
+      const saveStores = async (d) => { setStores(d); await storage.set('stores', JSON.stringify(d)); };
+      const saveRecords = async (d) => { setRecords(d); await storage.set('records', JSON.stringify(d)); };
+
+      const StoreForm = ({ s, onDone }) => {
+        const [f, setF] = useState(s || { name: '', hourlyWage: '', deductionRate: '', drinkBack: 200, shotBack: 500, nominationBack: 700, mainNominationBack: 1000 });
+        const [del, setDel] = useState(false);
+        const save = () => { if (!f.name || !f.hourlyWage || !f.deductionRate) return; saveStores(s ? stores.map(x => x.id === s.id ? { ...f, id: s.id } : x) : [...stores, { ...f, id: Date.now() }]); onDone(); };
+        return (
+          <div className="p-6 space-y-4">
+            <input className="w-full bg-gray-800 border border-purple-500 rounded px-4 py-3 text-white" placeholder="店名" value={f.name} onChange={e => setF({...f, name: e.target.value})} />
+            <input type="number" className="w-full bg-gray-800 border border-purple-500 rounded px-4 py-3 text-white" placeholder="時給" value={f.hourlyWage} onChange={e => setF({...f, hourlyWage: e.target.value})} />
+            <input type="number" className="w-full bg-gray-800 border border-purple-500 rounded px-4 py-3 text-white" placeholder="控除%" value={f.deductionRate} onChange={e => setF({...f, deductionRate: e.target.value})} />
+            <div className="grid grid-cols-2 gap-2">
+              <input type="number" className="bg-gray-800 border border-purple-500 rounded px-3 py-2 text-white text-sm" placeholder="ドリンク" value={f.drinkBack} onChange={e => setF({...f, drinkBack: e.target.value})} />
+              <input type="number" className="bg-gray-800 border border-purple-500 rounded px-3 py-2 text-white text-sm" placeholder="ショット" value={f.shotBack} onChange={e => setF({...f, shotBack: e.target.value})} />
+              <input type="number" className="bg-gray-800 border border-purple-500 rounded px-3 py-2 text-white text-sm" placeholder="場内指名" value={f.nominationBack} onChange={e => setF({...f, nominationBack: e.target.value})} />
+              <input type="number" className="bg-gray-800 border border-purple-500 rounded px-3 py-2 text-white text-sm" placeholder="本指名" value={f.mainNominationBack} onChange={e => setF({...f, mainNominationBack: e.target.value})} />
+            </div>
+            <div className="flex gap-3"><button onClick={save} className="flex-1 bg-purple-600 py-3 rounded">保存</button><button onClick={onDone} className="flex-1 bg-gray-700 py-3 rounded">戻る</button></div>
+            {s && !del && <button onClick={() => setDel(true)} className="w-full bg-red-600 py-3 rounded">削除</button>}
+            {s && del && <div className="bg-red-900 bg-opacity-30 border border-red-500 rounded p-4"><p className="text-center mb-3">削除しますか？</p><div className="flex gap-3"><button onClick={async () => { await saveStores(stores.filter(x => x.id !== s.id)); onDone(); }} className="flex-1 bg-red-600 py-3 rounded">削除</button><button onClick={() => setDel(false)} className="flex-1 bg-gray-700 py-3 rounded">戻る</button></div></div>}
+          </div>
+        );
+      };
+
+      const RecordForm = ({ r, onDone }) => {
+        const [f, setF] = useState(r || { storeId: '', date: new Date().toISOString().split('T')[0], startTime: '20:00', endTime: '01:00', hourlyWage: '', drink: 0, shot: 0, nomination: 0, mainNomination: 0, customBacks: [], transportCost: 0, drinkBack: 200, shotBack: 500, nominationBack: 700, mainNominationBack: 1000, backTiming: 'next', transTiming: 'ded' });
+        const [del, setDel] = useState(false);
+        const st = stores.find(x => x.id === Number(f.storeId));
+        useEffect(() => { if (st && !r) setF(x => ({ ...x, hourlyWage: st.hourlyWage, drinkBack: st.drinkBack || 200, shotBack: st.shotBack || 500, nominationBack: st.nominationBack || 700, mainNominationBack: st.mainNominationBack || 1000 })); }, [f.storeId, st, r]);
+        const hrs = () => { const [sh, sm] = f.startTime.split(':').map(Number); const [eh, em] = f.endTime.split(':').map(Number); let s = sh + sm / 60, e = eh + em / 60; if (e <= s) e += 24; return e - s; };
+        const bk = () => f.drink * (Number(f.drinkBack) || 200) + f.shot * (Number(f.shotBack) || 500) + f.nomination * (Number(f.nominationBack) || 700) + f.mainNomination * (Number(f.mainNominationBack) || 1000) + f.customBacks.reduce((s, b) => s + b.amount, 0);
+        const pay = () => { const h = hrs(), w = Number(f.hourlyWage) * h, b = bk(), tot = w + b; let ded = st ? tot * (st.deductionRate / 100) : 0; ded = Math.ceil(ded / 50) * 50; const tr = Number(f.transportCost) || 0; let im = f.backTiming === 'imm' ? w + b - ded : w - ded; let nx = f.backTiming === 'imm' ? 0 : b; let tp = f.transTiming === 'nx' ? tr : (im -= tr, 0); return { immediate: im, nextMonth: nx, transportPay: tp }; };
+        const save = () => { if (!f.storeId || !f.date || !f.hourlyWage) return; const p = pay(); saveRecords(r ? records.map(x => x.id === r.id ? { ...f, id: r.id, hours: hrs(), back: bk(), ...p } : x) : [...records, { ...f, id: Date.now(), hours: hrs(), back: bk(), ...p }]); onDone(); };
+        const Cnt = ({ l, v, o }) => <div className="flex justify-between bg-gray-800 rounded p-2"><span className="text-xs">{l}</span><div className="flex gap-2"><button onClick={() => o(Math.max(0, v - 1))} className="bg-purple-600 p-1 rounded"><Minus /></button><span className="w-8 text-center text-sm">{v}</span><button onClick={() => o(v + 1)} className="bg-purple-600 p-1 rounded"><Plus /></button></div></div>;
+        const p = pay();
+        return (
+          <div className="p-6 space-y-3">
+            <select className="w-full bg-gray-800 border border-purple-500 rounded px-4 py-2 text-white" value={f.storeId} onChange={e => setF({...f, storeId: e.target.value})}><option value="">店舗選択</option>{stores.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select>
+            <input type="date" className="w-full bg-gray-800 border border-purple-500 rounded px-4 py-2 text-white" value={f.date} onChange={e => setF({...f, date: e.target.value})} />
+            <div className="flex gap-2"><input type="time" className="flex-1 bg-gray-800 border border-purple-500 rounded px-3 py-2 text-white" value={f.startTime} onChange={e => setF({...f, startTime: e.target.value})} /><span className="flex items-center">〜</span><input type="time" className="flex-1 bg-gray-800 border border-purple-500 rounded px-3 py-2 text-white" value={f.endTime} onChange={e => setF({...f, endTime: e.target.value})} /></div>
+            <div className="text-xs text-purple-300">{hrs().toFixed(1)}h</div>
+            <input type="number" className="w-full bg-gray-800 border border-purple-500 rounded px-4 py-2 text-white" placeholder="時給" value={f.hourlyWage} onChange={e => setF({...f, hourlyWage: e.target.value})} />
+            <select className="w-full bg-gray-800 border border-purple-500 rounded px-3 py-2 text-white text-sm" value={f.backTiming} onChange={e => setF({...f, backTiming: e.target.value})}><option value="next">バック翌月</option><option value="imm">バック当日</option></select>
+            <div><input type="number" className="w-full bg-gray-800 border border-purple-500 rounded px-3 py-2 text-white text-sm mb-1" placeholder="送迎代" value={f.transportCost} onChange={e => setF({...f, transportCost: e.target.value})} /><select className="w-full bg-gray-800 border border-purple-500 rounded px-3 py-2 text-white text-xs" value={f.transTiming} onChange={e => setF({...f, transTiming: e.target.value})}><option value="ded">差引</option><option value="nx">次回</option></select></div>
+            <div className="space-y-1">
+              <Cnt l={`ドリンク¥${f.drinkBack||200}`} v={f.drink} o={v => setF({...f, drink: v})} />
+              <Cnt l={`ショット¥${f.shotBack||500}`} v={f.shot} o={v => setF({...f, shot: v})} />
+              <Cnt l={`場内¥${f.nominationBack||700}`} v={f.nomination} o={v => setF({...f, nomination: v})} />
+              <Cnt l={`本指名¥${f.mainNominationBack||1000}`} v={f.mainNomination} o={v => setF({...f, mainNomination: v})} />
+              {f.customBacks.map((c, i) => <div key={i} className="flex gap-1 bg-gray-800 rounded p-2"><input className="flex-1 bg-gray-900 border border-purple-500 rounded px-2 py-1 text-xs" value={c.name} onChange={e => setF({...f, customBacks: f.customBacks.map((b, j) => j === i ? {...b, name: e.target.value} : b)})} /><input type="number" className="w-20 bg-gray-900 border border-purple-500 rounded px-2 py-1 text-xs" value={c.amount} onChange={e => setF({...f, customBacks: f.customBacks.map((b, j) => j === i ? {...b, amount: Number(e.target.value)} : b)})} /><button onClick={() => setF({...f, customBacks: f.customBacks.filter((_, j) => j !== i)})} className="bg-red-600 p-1 rounded"><X /></button></div>)}
+              <button onClick={() => setF({...f, customBacks: [...f.customBacks, {name: '', amount: 0}]})} className="w-full bg-gray-700 py-2 rounded text-xs">追加</button>
+            </div>
+            <div className="bg-purple-900 bg-opacity-30 rounded p-3 space-y-1 text-sm"><div className="flex justify-between"><span>当日</span><span className="font-bold">¥{p.immediate.toLocaleString()}</span></div><div className="flex justify-between"><span>翌月</span><span className="font-bold">¥{p.nextMonth.toLocaleString()}</span></div>{p.transportPay > 0 && <div className="flex justify-between border-t border-purple-700 pt-1"><span>送迎</span><span className="font-bold text-green-400">¥{p.transportPay.toLocaleString()}</span></div>}</div>
+            <div className="flex gap-2"><button onClick={save} className="flex-1 bg-purple-600 py-2 rounded">保存</button><button onClick={onDone} className="flex-1 bg-gray-700 py-2 rounded">戻る</button></div>
+            {r && !del && <button onClick={() => setDel(true)} className="w-full bg-red-600 py-2 rounded">削除</button>}
+            {r && del && <div className="bg-red-900 bg-opacity-30 border border-red-500 rounded p-3"><p className="text-center mb-2 text-sm">削除？</p><div className="flex gap-2"><button onClick={async () => { await saveRecords(records.filter(x => x.id !== r.id)); onDone(); }} className="flex-1 bg-red-600 py-2 rounded">削除</button><button onClick={() => setDel(false)} className="flex-1 bg-gray-700 py-2 rounded">戻る</button></div></div>}
+          </div>
+        );
+      };
+
+      const Stats = ({ sid, y, m }) => {
+        const st = stores.find(s => s.id === Number(sid));
+        const rs = records.filter(r => Number(r.storeId) === Number(sid) && r.date.startsWith(`${y}-${String(m).padStart(2, '0')}`));
+        const tot = rs.reduce((s, r) => ({ im: s.im + r.immediate, nx: s.nx + r.nextMonth }), { im: 0, nx: 0 });
+        const h = rs.reduce((s, r) => s + r.hours, 0);
+        const bk = rs.reduce((s, r) => s + r.back, 0);
+        const bd = rs.reduce((s, r) => ({ d: s.d + (r.drink||0), s: s.s + (r.shot||0), n: s.n + (r.nomination||0), m: s.m + (r.mainNomination||0), c: s.c + (r.customBacks||[]).reduce((x, b) => x + b.amount, 0) }), { d: 0, s: 0, n: 0, m: 0, c: 0 });
+        const da = rs.reduce((s, r) => s + (r.drink||0) * (r.drinkBack||200), 0);
+        const sa = rs.reduce((s, r) => s + (r.shot||0) * (r.shotBack||500), 0);
+        const na = rs.reduce((s, r) => s + (r.nomination||0) * (r.nominationBack||700), 0);
+        const ma = rs.reduce((s, r) => s + (r.mainNomination||0) * (r.mainNominationBack||1000), 0);
+        return (
+          <div className="bg-gray-800 rounded p-3 mb-3">
+            <h3 className="font-bold text-purple-300 mb-2">{st?.name}</h3>
+            <div className="grid grid-cols-2 gap-3 mb-2 text-sm"><div><div className="text-xs text-gray-400">当月</div><div className="font-bold">¥{tot.im.toLocaleString()}</div></div><div><div className="text-xs text-gray-400">翌月</div><div className="font-bold">¥{tot.nx.toLocaleString()}</div></div></div>
+            <div className="text-xs text-gray-400 mb-2">{h.toFixed(1)}h / ¥{bk.toLocaleString()} / {rs.length}日</div>
+            <div className="bg-gray-900 rounded p-2 mb-2"><div className="text-xs text-purple-300 mb-1">バック</div><div className="grid grid-cols-2 gap-1 text-xs"><div className="flex justify-between"><span className="text-gray-400">ドリンク</span><span>{bd.d}¥{da.toLocaleString()}</span></div><div className="flex justify-between"><span className="text-gray-400">ショット</span><span>{bd.s}¥{sa.toLocaleString()}</span></div><div className="flex justify-between"><span className="text-gray-400">場内</span><span>{bd.n}¥{na.toLocaleString()}</span></div><div className="flex justify-between"><span className="text-gray-400">本指名</span><span>{bd.m}¥{ma.toLocaleString()}</span></div>{bd.c > 0 && <div className="flex justify-between col-span-2"><span className="text-gray-400">他</span><span>¥{bd.c.toLocaleString()}</span></div>}</div></div>
+            <div className="space-y-1">{rs.length === 0 ? <div className="text-center text-gray-500 text-xs py-3">なし</div> : rs.sort((a, b) => b.date.localeCompare(a.date)).map(r => <div key={r.id} className="bg-gray-900 rounded p-2"><div className="flex justify-between items-center mb-1"><span className="text-xs">{r.date}</span><div className="flex items-center gap-1"><span className="font-bold text-sm">¥{r.immediate.toLocaleString()}</span><button onClick={() => { setEdit(r); setView('editRec'); }} className="p-1 bg-purple-600 rounded"><Edit2 size={12} /></button></div></div><div className="text-xs text-gray-400">{r.hours.toFixed(1)}h ¥{r.hourlyWage} バック¥{r.back}</div></div>)}</div>
+          </div>
+        );
+      };
+
+      const Monthly = () => {
+        const [y, setY] = useState(new Date().getFullYear());
+        const [m, setM] = useState(new Date().getMonth() + 1);
+        const rs = records.filter(r => r.date.startsWith(`${y}-${String(m).padStart(2, '0')}`));
+        const ids = [...new Set(rs.map(r => Number(r.storeId)))];
+        const tot = rs.reduce((s, r) => ({ im: s.im + r.immediate, nx: s.nx + r.nextMonth }), { im: 0, nx: 0 });
+        const h = rs.reduce((s, r) => s + r.hours, 0);
+        return (
+          <div className="p-6">
+            <div className="flex items-center gap-3 mb-4"><button onClick={() => m === 1 ? (setY(y - 1), setM(12)) : setM(m - 1)} className="bg-purple-600 p-2 rounded"><ChevronLeft size={18} /></button><h2 className="text-lg font-bold text-purple-300 flex-1 text-center">{y}年{m}月</h2><button onClick={() => m === 12 ? (setY(y + 1), setM(1)) : setM(m + 1)} className="bg-purple-600 p-2 rounded" style={{transform: 'rotate(180deg)'}}><ChevronLeft size={18} /></button></div>
+            <div className="bg-purple-900 bg-opacity-30 rounded p-3 mb-4"><div className="grid grid-cols-2 gap-3 mb-2"><div><div className="text-xs text-gray-400">当月</div><div className="text-xl font-bold">¥{tot.im.toLocaleString()}</div></div><div><div className="text-xs text-gray-400">翌月</div><div className="text-xl font-bold">¥{tot.nx.toLocaleString()}</div></div></div><div className="text-center pt-2 border-t border-purple-700"><div className="text-xs text-gray-400">総額</div><div className="text-2xl font-bold text-purple-200">¥{(tot.im + tot.nx).toLocaleString()}</div><div className="text-xs text-gray-500 mt-1">{h.toFixed(1)}h {rs.length}日</div></div></div>
+            {ids.length === 0 && <div className="text-center text-gray-500 py-6">なし</div>}
+            {ids.map(id => <Stats key={id} sid={id} y={y} m={m} />)}
+          </div>
+        );
+      };
+
+      return (
+        <div className="min-h-screen bg-black text-white">
+          <div className="max-w-2xl mx-auto">
+            <div className="bg-gradient-to-r from-purple-900 to-purple-700 p-4"><div className="flex items-center">{view !== 'menu' && <button onClick={() => setView('menu')} className="p-2"><ChevronLeft size={20} /></button>}<h1 className="text-xl font-bold flex-1 text-center">給料管理</h1>{view !== 'menu' && <div className="w-10"></div>}</div></div>
+            {view === 'menu' && <div className="p-6 space-y-3"><button onClick={() => setView('addRec')} className="w-full bg-purple-600 py-4 rounded-lg font-bold">給料入力</button><button onClick={() => setView('month')} className="w-full bg-purple-600 py-4 rounded-lg font-bold">月別集計</button><button onClick={() => setView('stores')} className="w-full bg-gray-800 py-4 rounded-lg font-bold">店舗管理</button><div className="bg-gray-900 rounded p-3 mt-4"><h3 className="text-xs text-gray-400 mb-2">店舗</h3>{stores.length === 0 ? <p className="text-gray-500 text-xs">なし</p> : <div className="space-y-2">{stores.map(s => <div key={s.id} className="bg-gray-800 rounded p-2"><div className="mb-1"><div className="text-sm font-bold">{s.name}</div><div className="text-xs text-gray-400">¥{s.hourlyWage} {s.deductionRate}%</div></div><button onClick={() => { setEdit(s); setView('editSt'); }} className="w-full bg-purple-600 py-1.5 rounded text-xs">編集</button></div>)}</div>}</div></div>}
+            {view === 'stores' && <div className="p-6"><button onClick={() => { setEdit(null); setView('addSt'); }} className="w-full bg-purple-600 py-3 rounded font-bold">新規追加</button></div>}
+            {view === 'addSt' && <StoreForm onDone={() => setView('menu')} />}
+            {view === 'editSt' && <StoreForm s={edit} onDone={() => setView('menu')} />}
+            {view === 'addRec' && <RecordForm onDone={() => setView('menu')} />}
+            {view === 'editRec' && <RecordForm r={edit} onDone={() => setView('month')} />}
+            {view === 'month' && <Monthly />}
+          </div>
+        </div>
+      );
+    };
+
+    ReactDOM.render(<App />, document.getElementById('root'));
+  </script>
+</body>
+</html>
